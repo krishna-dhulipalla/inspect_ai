@@ -1,6 +1,8 @@
 import logging
 import time
 
+import pytest
+
 from inspect_ai._util.constants import PKG_NAME
 from inspect_ai.model._call_tools import parse_tool_call
 from inspect_ai.tool import ToolInfo, ToolParam, ToolParams
@@ -61,6 +63,13 @@ def test_parse_bool_tool_call_without_a_dict():
     assert tool_call.arguments["param1"]
 
 
+def test_parse_null_tool_call_without_a_dict() -> None:
+    tool_call = parse_tool_call("id", "testing_tool", "null", [testing_tool])
+
+    assert tool_call.arguments == {"param1": None}
+    assert tool_call.parse_error is None
+
+
 def test_parse_single_quotes_in_string_tool_call_without_a_dict():
     # Tests if the parser correctly handles a string with a single quote, when they haven't been given as part of a JSON.
 
@@ -68,6 +77,28 @@ def test_parse_single_quotes_in_string_tool_call_without_a_dict():
 
     assert "param1" in tool_call.arguments
     assert tool_call.arguments["param1"] == "'"
+
+
+@pytest.mark.parametrize(
+    "arguments", [None, "", " \t\n"], ids=["none", "empty", "blank"]
+)
+def test_parse_empty_arguments_for_optional_parameters(arguments: str | None) -> None:
+    optional_tool = ToolInfo(
+        name="optional_tool",
+        description="A tool with only optional parameters.",
+        parameters=ToolParams(
+            properties={
+                "label": ToolParam(type="string", default="default"),
+                "count": ToolParam(type="integer", default=1),
+            },
+            required=[],
+        ),
+    )
+
+    tool_call = parse_tool_call("id", optional_tool.name, arguments, [optional_tool])
+
+    assert tool_call.arguments == {}
+    assert tool_call.parse_error is None
 
 
 def test_parse_empty_arguments_with_trailing_quotes():
